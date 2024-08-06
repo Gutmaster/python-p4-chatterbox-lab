@@ -14,13 +14,42 @@ migrate = Migrate(app, db)
 
 db.init_app(app)
 
-@app.route('/messages')
+@app.route('/messages', methods = ['GET', 'POST'])
 def messages():
-    return ''
+    if request.method == 'GET':
+        messages = Message.query.order_by(Message.created_at.asc()).all()
+        return make_response([message.to_dict() for message in messages], 200)
+    elif request.method == 'POST':
+        body = request.json.get('body')
+        username = request.json.get('username')
+        if not body or not username:
+            return make_response(jsonify({'error': 'Missing required fields'}), 400)
 
-@app.route('/messages/<int:id>')
+        message = Message(body=body, username=username)
+        db.session.add(message)
+        db.session.commit()
+
+        return make_response(message.to_dict(), 201)
+
+@app.route('/messages/<int:id>', methods = ['GET', 'PATCH', 'DELETE'])
 def messages_by_id(id):
-    return ''
+    message = Message.query.filter(Message.id == id).first()
+    if request.method == 'GET':
+        return make_response(message.to_dict(), 200)
+    elif request.method == 'PATCH':
+        body = request.json.get('body')
+        if not body:
+            return make_response(jsonify({'error': 'Missing required field'}), 400)
+
+        message.body = body
+        db.session.commit()
+
+        return make_response(message.to_dict(), 200)
+    elif request.method == 'DELETE':
+        db.session.delete(message)
+        db.session.commit()
+
+        return make_response(jsonify({'message': 'Message deleted'}), 204)
 
 if __name__ == '__main__':
     app.run(port=5555)
